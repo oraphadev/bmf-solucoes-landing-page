@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+@import "@fontsource/questrial";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+@theme {
+  /* superfícies */
+  --color-bg: #090909; /* Preto Profundo da marca — NUNCA #000 */
+  --color-surface: #101012;
+  --color-surface-2: #16161a;
+  --color-graphite: #323232;
+  --color-border: rgba(255, 255, 255, 0.08); /* hairlines */
+
+  /* texto */
+  --color-fg: #ffffff;
+  --color-fg-muted: #a1a3b4; /* Azul Apagado da marca */
+
+  /* acentos (marca) */
+  --color-red: #f14d41; /* Vermelho Vívido — CTA/acento/interação */
+  --color-red-deep: #ab1f1a; /* Vermelho Escuro Intenso — glows, gradientes profundos */
+  --color-blue: #597cff; /* Azul Vívido — acento secundário (MiO4u/dados) */
+
+  /* seção editorial clara (Créditos) */
+  --color-paper: #f8f8f7;
+  --color-ink: #16161a;
+
+  /* tipografia */
+  --font-display: "Questrial", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter Variable", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, monospace;
+
+  /* motion */
+  --ease-brand: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  html {
+    scroll-behavior: smooth;
+    /* offset da Nav fixa para saltos de âncora nativos (path sem ScrollSmoother) */
+    scroll-padding-top: 5rem;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-fg);
+    font-family: var(--font-body);
+  }
+
+  ::selection {
+    background: var(--color-red);
+    color: var(--color-fg);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-red);
+    outline-offset: 2px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-graphite);
+    border-radius: 999px;
+    border: 2px solid var(--color-bg);
+  }
+
+  html {
+    scrollbar-color: var(--color-graphite) var(--color-bg);
+    scrollbar-width: thin;
+  }
+}
+
+/* grain global — SVG feTurbulence overlay sutil */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.03;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.label-mono {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 0.75rem;
+  color: var(--color-fg-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
