@@ -88,10 +88,10 @@ const STAGES: Stage[] = [
   },
 ];
 
-// Posição (em vh) de cada âncora #mio/#mio4u/#emio dentro do wrapper de 360vh.
-// Como o pin percorre 260vh (360vh - 100vh de viewport), estes valores mapeiam
+// Posição (em vh) de cada âncora #mio/#mio4u/#emio dentro do wrapper de 300vh.
+// Como o pin percorre 200vh (300vh - 100vh de viewport), estes valores mapeiam
 // para o progresso 0 / 0.5 / 1, os centros de snap dos três estágios.
-const ANCHOR_VH = [0, 130, 260];
+const ANCHOR_VH = [0, 100, 200];
 
 const accentVar = (a: Accent) =>
   a === "blue" ? "var(--color-blue)" : "var(--color-red)";
@@ -315,14 +315,14 @@ function StaticStages() {
 }
 
 // ---------------------------------------------------------------------------
-// Layout animado (desktop): painel sticky com crossfade dirigido por scroll.
+// Layout animado (desktop): empilhamento de cards dirigido por scroll.
+// Cada estágio é um card auto-contido; ao rolar, o próximo entra por baixo e
+// se empilha sobre o anterior, que recua (escala↓ + sobe + esmaece) formando
+// um baralho. Sem trilho lateral.
 // ---------------------------------------------------------------------------
 function ScrollytellingStages() {
   const wrapperRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const fillRef = useRef<HTMLSpanElement>(null);
-  const railRef = useRef<HTMLDivElement>(null);
-  const dotRefs = useRef<(HTMLAnchorElement | null)[]>([]);
 
   useLayoutEffect(() => {
     const panel = panelRef.current;
@@ -330,22 +330,11 @@ function ScrollytellingStages() {
     if (!panel || !wrapper) return;
 
     const stages = gsap.utils.toArray<HTMLElement>("[data-stage]", panel);
-    const mediaOf = (i: number) =>
-      stages[i].querySelector<HTMLElement>("[data-media]");
-    let activeIdx = -1;
-
-    const setActive = (idx: number) => {
-      if (idx === activeIdx) return;
-      activeIdx = idx;
-      railRef.current?.style.setProperty("--accent", accentVar(STAGES[idx].accent));
-      dotRefs.current.forEach((d, i) =>
-        d?.setAttribute("data-active", String(i === idx)),
-      );
-    };
 
     const ctx = gsap.context(() => {
-      gsap.set(stages[0], { autoAlpha: 1, y: 0 });
-      gsap.set([stages[1], stages[2]], { autoAlpha: 0, y: 20 });
+      // Estado inicial: card 0 no centro; 1 e 2 fora da tela, embaixo.
+      gsap.set(stages[0], { yPercent: 0, scale: 1 });
+      gsap.set([stages[1], stages[2]], { yPercent: 115, scale: 1 });
 
       const tl = gsap.timeline({
         defaults: { ease: "none" },
@@ -355,7 +344,7 @@ function ScrollytellingStages() {
           end: "bottom bottom",
           // Pin via ScrollTrigger (não CSS sticky): sticky não funciona dentro
           // do #smooth-content do ScrollSmoother (wrapper fixed/overflow-hidden).
-          // pinSpacing:false → o wrapper de 360vh já fornece a distância de scroll.
+          // pinSpacing:false → o wrapper de 300vh já fornece a distância de scroll.
           pin: panel,
           pinSpacing: false,
           anticipatePin: 1,
@@ -364,121 +353,77 @@ function ScrollytellingStages() {
           // "fixed", e position:fixed dentro do #smooth-content transformado
           // treme conforme o lerp do smoother. Transform pina no mesmo tick.
           pinType: "transform",
-          // scrub numérico: o avanço visual "persegue" o scroll suavemente,
-          // em vez de saltar. Janelas de estágio equilibradas (~1/3 cada) com
-          // transições curtas de 10% entre elas.
           scrub: 0.8,
-          // Assenta o usuário nos centros dos 3 estágios (progresso 0 / .5 / 1)
-          // sem esforço, depois que o scroll para.
-          snap: {
-            snapTo: [0, 0.5, 1],
-            duration: { min: 0.2, max: 0.5 },
-            ease: "power2.inOut",
-            directional: true,
-            delay: 0.05,
-          },
-          onUpdate: (self) => {
-            const p = self.progress;
-            // Barra de progresso: derivada contínua de st.progress (transform-only).
-            if (fillRef.current)
-              fillRef.current.style.transform = `scaleY(${p})`;
-            // Estágio ativo: troca discreta nos meios das transições (0.33 / 0.67).
-            setActive(p < 0.33 ? 0 : p < 0.67 ? 1 : 2);
-          },
         },
       });
       // Normaliza o total do timeline para 1 → posições = frações de scroll.
       tl.to({}, { duration: 1 }, 0);
 
-      // Transição 01 → 02 (janela 0.28–0.38; estágio 02 assenta em 0.38–0.62)
-      tl.to(stages[0], { autoAlpha: 0, y: -20, duration: 0.1 }, 0.28);
-      tl.fromTo(mediaOf(1), { scale: 1.04 }, { scale: 1, duration: 0.1 }, 0.28);
-      tl.fromTo(
-        stages[1],
-        { autoAlpha: 0, y: 20 },
-        { autoAlpha: 1, y: 0, duration: 0.1 },
-        0.28,
-      );
-      // Transição 02 → 03 (janela 0.62–0.72; estágio 03 assenta em 0.72–1.0)
-      tl.to(stages[1], { autoAlpha: 0, y: -20, duration: 0.1 }, 0.62);
-      tl.fromTo(mediaOf(2), { scale: 1.04 }, { scale: 1, duration: 0.1 }, 0.62);
-      tl.fromTo(
-        stages[2],
-        { autoAlpha: 0, y: 20 },
-        { autoAlpha: 1, y: 0, duration: 0.1 },
-        0.62,
-      );
+      // Níveis de recuo do baralho (escala↓ + sobe um pouco).
+      const RECEDE_1 = { scale: 0.93, yPercent: -8 };
+      const RECEDE_2 = { scale: 0.86, yPercent: -14 };
+      // fromTo com start explícito + immediateRender:false: sob scrub, `.to()`
+      // captura o valor inicial preguiçosamente e pode pegar o estado errado
+      // (ex.: o recuo do card 1 pegava yPercent 115 em vez de 0 e "descia").
+      // Fixar o start elimina esse salto.
+      const CENTER = { scale: 1, yPercent: 0 };
+      const enter = (el: HTMLElement, at: number) =>
+        tl.fromTo(el, { yPercent: 115 }, { yPercent: 0, duration: 0.5, immediateRender: false }, at);
+      const recede = (
+        el: HTMLElement,
+        from: gsap.TweenVars,
+        to: gsap.TweenVars,
+        at: number,
+        dur = 0.5,
+      ) => tl.fromTo(el, from, { ...to, duration: dur, immediateRender: false }, at);
+
+      // Card 0 (frente → fundo): recuo CONTÍNUO num único tween [0→1]. Sem
+      // handoff no meio da rolagem → sem "tranco" na virada de estágio (p=0.5).
+      recede(stages[0], CENTER, RECEDE_2, 0, 1);
+      // Card 1: sobe ao centro [0→0.5], depois recua ao 1º nível [0.5→1].
+      enter(stages[1], 0);
+      recede(stages[1], CENTER, RECEDE_1, 0.5);
+      // Card 2: sobe ao centro [0.5→1].
+      enter(stages[2], 0.5);
     }, panel);
 
-    setActive(0);
     ScrollTrigger.refresh();
     return () => ctx.revert();
   }, []);
 
   return (
-    <div ref={wrapperRef} className="relative h-[360vh]">
+    <div ref={wrapperRef} className="relative h-[300vh]">
       {/* Âncoras posicionadas ao longo do trecho de rolagem (#mio/#mio4u/#emio). */}
       {STAGES.map((stage, i) => (
         <span
           key={stage.id}
           id={stage.id}
           aria-hidden
-          className="pointer-events-none absolute left-0 block h-px w-px scroll-mt-24"
+          className="pointer-events-none absolute left-0 block h-px w-px"
           style={{ top: `${ANCHOR_VH[i]}vh` }}
         />
       ))}
 
       <div
         ref={panelRef}
-        className="flex h-screen items-center overflow-hidden"
+        className="flex h-screen items-center justify-center overflow-hidden"
       >
-        <div className="relative mx-auto w-full max-w-7xl px-10 lg:px-16">
-          {/* Trilha de progresso vertical + labels clicáveis */}
-          <div
-            ref={railRef}
-            className="absolute left-4 top-1/2 z-10 flex -translate-y-1/2 flex-col items-start gap-6 lg:left-6"
-            style={{ ["--accent" as string]: "var(--color-red)" }}
-          >
-            <div className="absolute left-[5px] top-1 h-[calc(100%-0.5rem)] w-px bg-border">
-              <span
-                ref={fillRef}
-                className="absolute inset-x-0 top-0 block h-full origin-top bg-[var(--accent)]"
-                style={{ transform: "scaleY(0)" }}
-              />
-            </div>
-            {STAGES.map((stage, i) => (
-              <a
-                key={stage.id}
-                href={`#${stage.id}`}
-                ref={(el) => {
-                  dotRefs.current[i] = el;
-                }}
-                data-active="false"
-                aria-label={`Ir para ${stage.short}`}
-                className="group relative flex items-center gap-3 pl-4 font-mono text-[11px] uppercase tracking-[0.18em] text-fg-muted transition-colors data-[active=true]:text-fg"
-              >
-                <span className="absolute left-0 h-[11px] w-[11px] -translate-x-[3px] rounded-full border border-border bg-surface transition-colors group-data-[active=true]:border-[var(--accent)] group-data-[active=true]:bg-[var(--accent)]" />
-                {stage.short}
-              </a>
-            ))}
-          </div>
-
-          {/* Estágios empilhados (crossfade) */}
-          <div className="relative ml-16 h-[74vh] lg:ml-24">
-            {STAGES.map((stage) => (
-              <article
-                key={stage.id}
-                data-stage
-                className="absolute inset-0 grid grid-cols-1 items-center gap-8 md:grid-cols-2 md:gap-12"
-                style={{ ["--accent" as string]: accentVar(stage.accent) }}
-              >
+        <div className="relative mx-auto h-[76vh] w-full max-w-6xl px-6 lg:px-10">
+          {STAGES.map((stage, i) => (
+            <article
+              key={stage.id}
+              data-stage
+              className="absolute inset-x-6 inset-y-0 will-change-transform lg:inset-x-10"
+              style={{ zIndex: i + 1, ["--accent" as string]: accentVar(stage.accent) }}
+            >
+              <div className="relative grid h-full grid-cols-1 items-center gap-8 overflow-hidden rounded-[1.75rem] border border-border bg-surface-2 p-6 shadow-2xl shadow-black/50 md:grid-cols-2 md:gap-10 md:p-10">
                 <StageBody stage={stage} />
-                <div data-media className="h-[52vh] w-full">
+                <div data-media className="h-full min-h-[38vh] w-full">
                   <StageMedia media={stage.media} />
                 </div>
-              </article>
-            ))}
-          </div>
+              </div>
+            </article>
+          ))}
         </div>
       </div>
     </div>

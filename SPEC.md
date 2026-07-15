@@ -549,4 +549,4 @@ Estático. Apenas hover de links (underline, Motion, 180ms).
 
 ---
 
-*Fim do SPEC. Fonte de conteúdo: DISCOVERY.md (fatos), BRAND.md (marca), referencias-visuais.md (direção Deep Rig). Nenhuma métrica, cliente ou depoimento fora dessas fontes.*
+*Fim do SPEC. Fonte de conteúdo: context/cliente/DISCOVERY.md (fatos), context/cliente/BRAND.md (marca), context/design/REFERENCIAS-VISUAIS.md (direção Deep Rig). Nenhuma métrica, cliente ou depoimento fora dessas fontes.*
